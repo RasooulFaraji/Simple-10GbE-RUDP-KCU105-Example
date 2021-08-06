@@ -42,18 +42,28 @@ end App;
 
 architecture mapping of App is
 
-   constant TX_INDEX_C  : natural := 0;
-   constant MEM_INDEX_C : natural := 1;
+   
 
-   constant NUM_AXIL_MASTERS_C : positive := 2;
+   constant NUM_AXIL_MASTERS_C : positive := 3;
+   
+   constant TX_INDEX_C      : natural := 0;
+   constant MEM_INDEX_C     : natural := 1;
+   constant TEST_REG_C      : natural := 2;
 
-   constant XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(NUM_AXIL_MASTERS_C, x"8000_0000", 20, 16);
+   --constant XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXIL_MASTERS_C-1 downto 0) := genAxiLiteConfig(NUM_AXIL_MASTERS_C, x"8000_0000", 20, 16);
+   constant XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXIL_MASTERS_C-1 downto 0) := (
+      TX_INDEX_C       => (baseAddr      => x"8000_0000", addrBits      => 16, connectivity  => x"FFFF"),
+      MEM_INDEX_C      => (baseAddr      => x"8001_0000", addrBits      => 16, connectivity  => x"FFFF"),
+      TEST_REG_C       => (baseAddr      => x"8002_0000", addrBits      => 16, connectivity  => x"FFFF"));
+      
 
    signal axilWriteMasters : AxiLiteWriteMasterArray(NUM_AXIL_MASTERS_C-1 downto 0);
    signal axilWriteSlaves  : AxiLiteWriteSlaveArray(NUM_AXIL_MASTERS_C-1 downto 0) := (others => AXI_LITE_WRITE_SLAVE_EMPTY_SLVERR_C);
    signal axilReadMasters  : AxiLiteReadMasterArray(NUM_AXIL_MASTERS_C-1 downto 0);
    signal axilReadSlaves   : AxiLiteReadSlaveArray(NUM_AXIL_MASTERS_C-1 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_SLVERR_C);
-
+    
+   signal axiliteRegsExampleWriteRead : Slv32Array(1-1 downto 0);
+    
 begin
 
    -------------------------------
@@ -119,5 +129,24 @@ begin
          axiReadSlave   => axilReadSlaves(MEM_INDEX_C),
          axiWriteMaster => axilWriteMasters(MEM_INDEX_C),
          axiWriteSlave  => axilWriteSlaves(MEM_INDEX_C));
+         
+   ------------------------------
+   -- AXI-LiteRegs Example Module
+   ------------------------------
+   U_AxiLiteRegsExample : entity surf.AxiLiteRegs
+      generic map (
+         TPD_G                     => TPD_G,
+         NUM_WRITE_REG_G           => 1,
+         INI_WRITE_REG_G           => (0 => x"0000_0F0F"),
+         NUM_READ_REG_G            => 1)
+      port map (
+         axiClk         => axilClk,
+         axiClkRst      => axilRst,
+         axiReadMaster  => axilReadMasters(TEST_REG_C),
+         axiReadSlave   => axilReadSlaves(TEST_REG_C),
+         axiWriteMaster => axilWriteMasters(TEST_REG_C),
+         axiWriteSlave  => axilWriteSlaves(TEST_REG_C),
+         writeRegister  => axiliteRegsExampleWriteRead,
+         readRegister   => axiliteRegsExampleWriteRead);         
 
 end mapping;

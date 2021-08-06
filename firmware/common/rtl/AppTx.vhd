@@ -157,7 +157,9 @@ begin
 
                -- Send the data
                v.txMaster.tValid             := '1';
-               v.txMaster.tData(63 downto 0) := resize(r.wordCnt, 64);
+               v.txMaster.tData(63 downto 0) := resize(r.wordCnt, 64); ---- The counter!!!!!!!!!!!!!
+               
+               --v.txMaster.tData(63 downto 0) := resize(toSlv(150, 64), 64); ---- The counter!!!!!!!!!!!!!
 
                -- Check for Start Of Frame (SOF)
                if (r.wordCnt = 0) then

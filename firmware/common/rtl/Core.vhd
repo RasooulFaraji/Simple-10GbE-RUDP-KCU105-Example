@@ -86,6 +86,7 @@ architecture mapping of Core is
    constant APP_INDEX_C     : natural := 6;
 
    constant NUM_AXIL_MASTERS_C : positive := 7;
+   constant NUM_I2C_SLAVE_C    : positive := 8;
 
    constant XBAR_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_AXIL_MASTERS_C-1 downto 0) := (
       VERSION_INDEX_C => (baseAddr => x"0000_0000", addrBits => 16, connectivity => x"FFFF"),
@@ -106,7 +107,7 @@ architecture mapping of Core is
    signal axilReadMasters  : AxiLiteReadMasterArray(NUM_AXIL_MASTERS_C-1 downto 0);
    signal axilReadSlaves   : AxiLiteReadSlaveArray(NUM_AXIL_MASTERS_C-1 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_SLVERR_C);
 
-   constant XBAR_I2C_CONFIG_C : AxiLiteCrossbarMasterConfigArray(7 downto 0) := genAxiLiteConfig(8, XBAR_CONFIG_C(I2C_INDEX_C).baseAddr, 16, 12);
+   constant XBAR_I2C_CONFIG_C : AxiLiteCrossbarMasterConfigArray(NUM_I2C_SLAVE_C-1 downto 0) := genAxiLiteConfig(NUM_I2C_SLAVE_C, XBAR_CONFIG_C(I2C_INDEX_C).baseAddr, 16, 12);
 
    constant SFF8472_I2C_CONFIG_C : I2cAxiLiteDevArray(1 downto 0) := (
       0              => MakeI2cAxiLiteDevType(
@@ -122,13 +123,21 @@ architecture mapping of Core is
          endianness  => '0',            -- Little endian
          repeatStart => '1'));          -- Repeat Start
 
-   signal i2cReadMasters  : AxiLiteReadMasterArray(7 downto 0);
-   signal i2cReadSlaves   : AxiLiteReadSlaveArray(7 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_DECERR_C);
-   signal i2cWriteMasters : AxiLiteWriteMasterArray(7 downto 0);
-   signal i2cWriteSlaves  : AxiLiteWriteSlaveArray(7 downto 0) := (others => AXI_LITE_WRITE_SLAVE_EMPTY_DECERR_C);
+   constant TCA6416_I2C_CONFIG_C : I2cAxiLiteDevArray(0 downto 0) := (
+      0              => MakeI2cAxiLiteDevType(
+         i2cAddress  => "0100001",      -- 2 wire address 0100001 (A0h)
+         dataSize    => 8,             -- in units of bits
+         addrSize    => 8,              -- in units of bits
+         endianness  => '0',            -- Little endian
+         repeatStart => '1'));          -- Repeat Start         
+
+   signal i2cReadMasters  : AxiLiteReadMasterArray(NUM_I2C_SLAVE_C-1 downto 0);
+   signal i2cReadSlaves   : AxiLiteReadSlaveArray(NUM_I2C_SLAVE_C-1 downto 0)  := (others => AXI_LITE_READ_SLAVE_EMPTY_DECERR_C);
+   signal i2cWriteMasters : AxiLiteWriteMasterArray(NUM_I2C_SLAVE_C-1 downto 0);
+   signal i2cWriteSlaves  : AxiLiteWriteSlaveArray(NUM_I2C_SLAVE_C-1 downto 0) := (others => AXI_LITE_WRITE_SLAVE_EMPTY_DECERR_C);
 
    signal i2ci : i2c_in_type;
-   signal i2coVec : i2c_out_array(8 downto 0) := (
+   signal i2coVec : i2c_out_array(NUM_I2C_SLAVE_C downto 0) := (
       others    => (
          scl    => '1',
          scloen => '1',
@@ -415,7 +424,7 @@ begin
 
       GEN_SFP :
       for i in 2 to 3 generate
-         U_I2C : entity surf.AxiI2cRegMasterCore
+         U_I2C_SFP : entity surf.AxiI2cRegMasterCore
             generic map (
                TPD_G          => TPD_G,
                I2C_SCL_FREQ_G => 400.0E+3,  -- units of Hz
@@ -435,13 +444,32 @@ begin
                axiRst         => rst);
       end generate GEN_SFP;
 
+      U_I2C_TCA : entity surf.AxiI2cRegMasterCore
+         generic map (
+            TPD_G          => TPD_G,
+            I2C_SCL_FREQ_G => 400.0E+3,  -- units of Hz
+            DEVICE_MAP_G   => TCA6416_I2C_CONFIG_C,
+            AXI_CLK_FREQ_G => 156.25E+6)
+         port map (
+            -- I2C Ports
+            i2ci           => i2ci,
+            i2co           => i2coVec(1),
+            -- AXI-Lite Register Interface
+            axiReadMaster  => i2cReadMasters(1),
+            axiReadSlave   => i2cReadSlaves(1),
+            axiWriteMaster => i2cWriteMasters(1),
+            axiWriteSlave  => i2cWriteSlaves(1),
+            -- Clocks and Resets
+            axiClk         => clk,
+            axiRst         => rst);
+               
       process(i2cReadMasters, i2cWriteMasters, i2coVec)
          variable tmp : i2c_out_type;
       begin
          -- Init (Default to I2C MUX endpoint)
-         tmp := i2coVec(8);
+         tmp := i2coVec(NUM_I2C_SLAVE_C);
          -- Check for TXN after XBAR/I2C_MUX
-         for i in 0 to 7 loop
+         for i in 0 to NUM_I2C_SLAVE_C-1 loop
             if (i2cWriteMasters(i).awvalid = '1') or (i2cReadMasters(i).arvalid = '1') then
                tmp := i2coVec(i);
             end if;

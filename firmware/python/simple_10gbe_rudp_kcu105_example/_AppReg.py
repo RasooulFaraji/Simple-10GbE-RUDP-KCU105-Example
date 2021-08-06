@@ -10,21 +10,23 @@
 
 import pyrogue as pr
 
-import simple_10gbe_rudp_kcu105_example as devBoard
-
-class App(pr.Device):
-    def __init__( self,sim=False,**kwargs):
+class AppReg(pr.Device):
+    def __init__( self,**kwargs):
         super().__init__(**kwargs)
 
-        self.add(devBoard.AppTx(
-            offset = 0x0000_0000,
-            expand = True,
+        self.add(pr.RemoteVariable(
+            name         = 'Write',
+            description  = 'Read from the register',
+            offset       = 0x000,
+            bitSize      = 16,
+            mode         = 'RO',
         ))
 
-        self.add(devBoard.AppMem(
-            offset  = 0x0001_0000,
+        self.add(pr.RemoteVariable(
+            name         = 'Read',
+            description  = 'Write into the register',
+            offset       = 0x100,
+            bitSize      = 16,
+            mode         = 'WO',
         ))
 
-        self.add(devBoard.AppReg(
-            offset  = 0x0002_0000,
-        ))

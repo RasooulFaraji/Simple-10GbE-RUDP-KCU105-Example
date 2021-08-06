@@ -17,6 +17,7 @@ import surf.ethernet.udp         as udp
 import surf.ethernet.ten_gig     as mac
 import surf.protocols.rssi       as rssi
 import surf.xilinx               as xil
+import simple_10gbe_rudp_kcu105_example as i2csw2
 
 class Core(pr.Device):
     def __init__( self,
@@ -78,5 +79,9 @@ class Core(pr.Device):
 
             self.add(xceiver.Sfp(
                 offset      = 0x0020_2000,
+                enabled     = not sim,
+            ))
+            self.add(i2csw2.Tca6416(
+                offset      = 0x0020_1000,
                 enabled     = not sim,
             ))
